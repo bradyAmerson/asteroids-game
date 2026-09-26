@@ -5,18 +5,23 @@ const CONFIG = {
   shipRotationSpeed: 0.06,
   shipThrust: 0.08,
   shipReverseThrust: 0.03,
-  shipMaxSpeed: 20,
+  shipMaxSpeed: 8,
   shipFriction:0.995,
-
-
   
   // Weapons
-  fireRate: 8,
+  
+  fireRate: 35,
   fireMode: "single",
   tripleShot: false,
-  bulletSpeed: 8,
+  bulletSpeed: 12,
   bulletDamage: 1,
-  bulletSize: 4,
+  bulletSize: 6,
+  
+  // Turbo
+  // Initial Values: 150, 8, 180
+  turboDuration: 150,
+  turboFireRate: 8,
+  turboReloadTime: 180,
   
   // Asteroids
   asteroidSpawnRate: 90,
@@ -34,8 +39,12 @@ const CONFIG = {
   backgroundColor: "#000000",
 
   // Effects
-  trailParticleLifetime: 30,
+  // initial values: 35, 6, 255, 255, 255, 0, 100, 255, 2.5
+  trailParticleLifetime: 35,
   trailParticleSize: 6,
+  trailStartColor: { r: 255, g: 255, b: 255},
+  trailEndColor: { r: 0, g: 100, b: 255},
+  trailColorFadePower: 2.5,
 }
 
 const IMAGES = {};
@@ -89,6 +98,26 @@ const ship = {
 
 const particles = [];
 
+const bullets = [];
+let fireCooldown = 0;
+let turboActive = false;
+let turboTimer = 0;
+let reloadTimer = 0;
+
+
+function spawnBullet(sideOffset = 0, forwardOffset = CONFIG.shipSize)  {
+  const perpX = -Math.sin(ship.angle);
+  const perpY = Math.cos(ship.angle);
+
+  bullets.push({
+    x: ship.x + Math.cos(ship.angle) * forwardOffset + perpX * sideOffset,
+    y: ship.y + Math.sin(ship.angle) * forwardOffset + perpY * sideOffset,
+    velocityX: Math.cos(ship.angle) * CONFIG.bulletSpeed + ship.velocityX,
+    velocityY: Math.sin(ship.angle) * CONFIG.bulletSpeed + ship.velocityY,
+    angle: ship.angle,
+  })
+}
+
 function spawnTrailParticle() {
   const backX = ship.x - Math.cos(ship.angle) * CONFIG.shipSize;
   const backY = ship.y - Math.sin(ship.angle) * CONFIG.shipSize;
@@ -104,10 +133,34 @@ const keys = {};
 
 window.addEventListener("keydown", (e) => {
   keys[e.key] = true;
+
+  if (e.key === "t")  {
+    CONFIG.tripleShot = !CONFIG.tripleShot;
+  }
 });
 
 window.addEventListener("keyup", (e) => {
   keys[e.key] = false;
+});
+
+window.addEventListener("mousedown", (e) => {
+  if (e.button === 0) {
+    keys["Mouse0"] = true
+  }
+  if (e.button === 2 && reloadTimer <= 0 && !turboActive) {
+    turboActive = true;
+    turboTimer = CONFIG.turboDuration;
+  }
+});
+
+window.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+});
+
+window.addEventListener("mouseup", (e) => {
+  if (e.button === 0) {
+    keys["Mouse0"] = false;
+  }
 });
 
 function update() {
@@ -159,21 +212,70 @@ function update() {
       
     }
   }
+
+  if (turboActive)  {
+    turboTimer--;
+    if (turboTimer <= 0)  {
+      turboActive = false;
+      reloadTimer = CONFIG.turboReloadTime;
+    }
+  }
+
+  if (reloadTimer > 0)  {
+    reloadTimer--;
+  }
+
+  if (fireCooldown > 0) {
+    fireCooldown--;
+  }
+
+  if ((keys[" "] || keys["Mouse0"] || turboActive) && fireCooldown <= 0 && reloadTimer <= 0) {
+    if (CONFIG.tripleShot)  {
+        spawnBullet(-17, -16);
+        spawnBullet(0, 7);
+        spawnBullet(17, -16);
+    } else  {
+        spawnBullet();
+    }
+    fireCooldown = turboActive ? CONFIG.turboFireRate : CONFIG.fireRate;
+  }
+
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    bullets[i].x += bullets[i].velocityX;
+    bullets[i].y += bullets[i].velocityY;
+
+    if (
+      bullets[i].x < 0 ||
+      bullets[i].x > canvas.width ||
+      bullets[i].y < 0 ||
+      bullets[i].y > canvas.height
+    ) {
+      bullets.splice(i, 1);
+    }
+  }
 }
 
 function drawParticles()  {
   for (const p of particles)  {
     const lifeRatio = p.life / CONFIG.trailParticleLifetime;
     const shrinkFactor = lifeRatio ** 1.45;
-
     const glowRadius = CONFIG.trailParticleSize * 2 * shrinkFactor;
+
+    const colorRatio = lifeRatio ** CONFIG.trailColorFadePower;
+
+    const start = CONFIG.trailStartColor;
+    const end = CONFIG.trailEndColor;
+
+    const r = Math.round(end.r + (start.r - end.r) * colorRatio);
+    const g = Math.round(end.g + (start.g - end.g) * colorRatio);
+    const b = Math.round(end.b + (start.b - end.b) * colorRatio);
 
     const gradient = ctx.createRadialGradient(
       p.x, p.y, 0,
       p.x, p.y, glowRadius
     );
-    gradient.addColorStop(0, `rgba(0, 200, 255, ${lifeRatio})`);
-    gradient.addColorStop(1, `rgba(0, 200, 255, 0)`);
+    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${lifeRatio})`);
+    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
 
 
     ctx.fillStyle = gradient;
@@ -197,12 +299,29 @@ function drawShip() {
   ctx.restore();
 }
 
+function drawBullets()  {
+  for (const b of bullets)  {
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.angle + Math.PI / 2);
+    ctx.drawImage(
+      IMAGES.bulletImg,
+      -CONFIG.bulletSize,
+      -CONFIG.bulletSize,
+      CONFIG.bulletSize * 2,
+      CONFIG.bulletSize * 2,
+    );
+    ctx.restore();
+  }
+}
+
 function draw() {
   ctx.fillStyle = CONFIG.backgroundColor;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
   drawParticles();
   drawShip();
+  drawBullets();
 }
 
 function gameLoop()  {
