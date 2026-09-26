@@ -1,7 +1,7 @@
 const CONFIG = {
   // Ship
   // Initial values: 25, 0.06, 0.08, 0.03, 8, 0.995
-  shipSize: 35,
+  shipSize: 25,
   shipRotationSpeed: 0.06,
   shipThrust: 0.08,
   shipReverseThrust: 0.03,
@@ -35,7 +35,7 @@ const CONFIG = {
 
   // Effects
   trailParticleLifetime: 30,
-  trailParticleSize: 7,
+  trailParticleSize: 6,
 }
 
 const IMAGES = {};
@@ -131,8 +131,8 @@ function update() {
   }
 
   if (keys["x"])  {
-    ship.velocityX = 0;
-    ship.velocityY = 0;
+    ship.velocityX *= 0.92;
+    ship.velocityY *= 0.92;
   }
 
   const speed = Math.sqrt(ship.velocityX ** 2 + ship.velocityY ** 2);
