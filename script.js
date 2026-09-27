@@ -5,7 +5,7 @@ const CONFIG = {
   shipRotationSpeed: 0.038,
   shipThrust: 0.065,
   shipReverseThrust: 0.03,
-  shipMaxSpeed: 6.5,
+  shipMaxSpeed: 5,
   shipFriction:0.995,
   shipLives: 3,
   shipInvincibleDuration: 365,
@@ -42,7 +42,7 @@ const CONFIG = {
   musicVolume: 0.3,
 
   // Color
-  backgroundColor: "#000000",
+  backgroundColor: "#110721",
 
   // Effects
   // initial values: 35, 6, 255, 255, 255, 0, 100, 255, 2.5
