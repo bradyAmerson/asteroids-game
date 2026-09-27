@@ -3,7 +3,7 @@ const CONFIG = {
   // Initial values: 25, 0.06, 0.08, 0.03, 8, 0.995
   shipSize: 25,
   shipRotationSpeed: 0.038,
-  shipThrust: 0.065,
+  shipThrust: 0.05,
   shipReverseThrust: 0.03,
   shipMaxSpeed: 5,
   shipFriction:0.995,
