@@ -117,6 +117,7 @@ let gameOver = false;
 let score = 0;
 let highScore = 0;
 let respawnTimer = 0;
+let isNewHighScore = false;
 
 const asteroids = [];
 let asteroidSpawnTimer = 0;
@@ -310,6 +311,7 @@ function checkShipAsteroidCollision() {
 
       if (lives <= 0) {
         gameOver = true;
+        isNewHighScore = (score === highScore && highScore > 0);
       } else  {
         respawnTimer = CONFIG.explosionDuration;
       }
@@ -357,18 +359,32 @@ window.addEventListener("mouseup", (e) => {
 });
 
 function update() {
-  if (gameOver) {
+    if (gameOver) {
     for (let i = particles.length - 1; i >= 0; i--) {
       particles[i].life--;
       if (particles[i].life <= 0) {
         particles.splice(i, 1);
       }
-    } 
+    }
 
     for (let i = explosions.length - 1; i >= 0; i--) {
       explosions[i].life--;
       if (explosions[i].life <= 0) {
         explosions.splice(i, 1);
+      }
+    }
+
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      bullets[i].x += bullets[i].velocityX;
+      bullets[i].y += bullets[i].velocityY;
+
+      if (
+        bullets[i].x < 0 ||
+        bullets[i].x > canvas.width ||
+        bullets[i].y < 0 ||
+        bullets[i].y > canvas.height
+      ) {
+        bullets.splice(i, 1);
       }
     }
 
@@ -602,12 +618,14 @@ function drawBullets()  {
 }
 
 function drawHUD()  {
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "#66d1de";
   ctx.font = "400 30px 'Audiowide', sans-serif";
   ctx.textAlign = "left";
   ctx.fillText(`Lives: ${lives}`, 20, 30);
   ctx.textAlign = "right";
+  //ctx.fillStyle = "#ffffff";
   ctx.fillText(`Score: ${score}`, canvas.width - 20, 30);
+  //ctx.fillStyle = "#ffdd00";
   ctx.fillText(`High Score: ${highScore}`, canvas.width - 20, 58);
 }
 
@@ -615,20 +633,32 @@ function drawGameOver() {
   ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "#ff3333";
   ctx.textAlign = "center";
   ctx.font = "900 64px 'Audiowide', sans-serif";
   ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
-
+  
   ctx.font = "700 32px 'Audiowide', sans-serif";
+  ctx.fillStyle = "#66d1de";
   ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
+  //ctx.fillStyle = "#aaaaaa";
   ctx.fillText("Press R to Restart", canvas.width / 2, canvas.height / 2 + 60);
+
+  if (isNewHighScore) {
+    const flashOn = Math.floor(Date.now() / 350) % 2 === 0;
+    if (flashOn)  {
+      ctx.fillStyle = "#ffee33";
+      ctx.font = "900 48px 'Audiowide', sans-serif";
+      ctx.fillText(`New High Score: ${highScore}`, canvas.width / 2, canvas.height / 2 - 90);
+    }
+  }
 }
 
 function resetGame()  {
   lives = CONFIG.shipLives;
   score = 0;
   gameOver = false;
+  isNewHighScore = false;
 
   asteroids.length = 0;
   bullets.length = 0;
