@@ -3,9 +3,9 @@ const CONFIG = {
   // Initial values: 25, 0.06, 0.08, 0.03, 8, 0.995
   shipSize: 25,
   shipRotationSpeed: 0.038,
-  shipThrust: 0.08,
+  shipThrust: 0.065,
   shipReverseThrust: 0.03,
-  shipMaxSpeed: 8,
+  shipMaxSpeed: 6.5,
   shipFriction:0.995,
   shipLives: 3,
   shipInvincibleDuration: 365,
@@ -51,6 +51,8 @@ const CONFIG = {
   trailStartColor: { r: 255, g: 255, b: 255},
   trailEndColor: { r: 0, g: 100, b: 255},
   trailColorFadePower: 2.5,
+  explosionSize: 100,
+  explosionDuration: 150,
 }
 
 const IMAGES = {};
@@ -60,6 +62,7 @@ const ASSET_PATHS = {
   asteroidLarge: "assets/asteroid-large.png",
   asteroidMedium: "assets/asteroid-medium.png",
   asteroidSmall: "assets/asteroid-small.png",
+  explosion: "assets/explosion.png",
 };
 
 let imagesLoaded = 0;
@@ -81,7 +84,6 @@ function loadImages(callback) {
     IMAGES[key] = img;
   }
 }
-
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
@@ -112,6 +114,9 @@ let reloadTimer = 0;
 let lives = CONFIG.shipLives;
 let invincibleTimer = 0;
 let gameOver = false;
+let score = 0;
+let highScore = 0;
+let respawnTimer = 0;
 
 const asteroids = [];
 let asteroidSpawnTimer = 0;
@@ -126,6 +131,12 @@ function pickAsteroidSize() {
 
   if (roll < weights.medium) return "medium";
   return "small";
+}
+
+function getAsteroidPoints(size)  {
+  if (size === "large") return 20;
+  if (size === "medium") return 50;
+  return 100;
 }
 
 function getAsteroidStats(size) {
@@ -245,6 +256,10 @@ function checkBulletAsteroidCollisions()  {
         asteroids[j].hp -= CONFIG.bulletDamage;
 
         if (asteroids[j].hp <= 0)  {
+          score += getAsteroidPoints(asteroids[j].size);
+          if (score > highScore)  {
+            highScore = score;
+          }
           const splitSize = getSplitSize(asteroids[j].size);
 
           if (splitSize)  {
@@ -262,6 +277,16 @@ function checkBulletAsteroidCollisions()  {
   }
 }
 
+const explosions = [];
+
+function spawnExplosion(x, y) {
+  explosions.push({
+    x: x,
+    y: y,
+    life: CONFIG.explosionDuration,
+  });
+}
+
 function respawnShip() {
   ship.x = canvas.width / 2;
   ship.y = canvas.height / 2;
@@ -272,7 +297,7 @@ function respawnShip() {
 }
 
 function checkShipAsteroidCollision() {
-  if (invincibleTimer > 0) return;
+  if (invincibleTimer > 0 || respawnTimer > 0) return;
 
   for (const a of asteroids)  {
     const dx = ship.x - a.x;
@@ -281,11 +306,12 @@ function checkShipAsteroidCollision() {
 
     if (distance < a.radius + CONFIG.shipSize * 0.5)  {
       lives--;
-      
+      spawnExplosion(ship.x, ship.y);
+
       if (lives <= 0) {
         gameOver = true;
       } else  {
-        respawnShip();
+        respawnTimer = CONFIG.explosionDuration;
       }
       break;
     }
@@ -299,6 +325,10 @@ window.addEventListener("keydown", (e) => {
 
   if (e.key === "t")  {
     CONFIG.tripleShot = !CONFIG.tripleShot;
+  }
+
+  if (e.key === "r" && gameOver)  {
+    resetGame();
   }
 });
 
@@ -327,54 +357,88 @@ window.addEventListener("mouseup", (e) => {
 });
 
 function update() {
-  if (gameOver) return;
+  if (gameOver) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      particles[i].life--;
+      if (particles[i].life <= 0) {
+        particles.splice(i, 1);
+      }
+    } 
 
-  if (keys["ArrowLeft"] || keys["a"]) {
-    ship.angle -= CONFIG.shipRotationSpeed;
-  }
-  
-  if (keys["ArrowRight"] || keys["d"])  {
-    ship.angle += CONFIG.shipRotationSpeed;
-  }
+    for (let i = explosions.length - 1; i >= 0; i--) {
+      explosions[i].life--;
+      if (explosions[i].life <= 0) {
+        explosions.splice(i, 1);
+      }
+    }
 
-  if (keys["ArrowUp"] || keys["w"]) {
-    ship.velocityX += Math.cos(ship.angle) * CONFIG.shipThrust;
-    ship.velocityY += Math.sin(ship.angle) * CONFIG.shipThrust;
-    spawnTrailParticle();
-  }
+    for (const a of asteroids)  {
+      a.x += a.velocityX;
+      a.y += a.velocityY;
 
-  if (keys["ArrowDown"] || keys["s"]) {
-    ship.velocityX -= Math.cos(ship.angle) * CONFIG.shipReverseThrust;
-    ship.velocityY -= Math.sin(ship.angle) * CONFIG.shipReverseThrust;
-  }
+      if (a.x < -a.radius) a.x = canvas.width + a.radius;
+      if (a.x > canvas.width + a.radius) a.x = -a.radius;
+      if (a.y < -a.radius) a.y = canvas.height + a.radius;
+      if (a.y > canvas.height + a.radius) a.y = -a.radius
+    }
 
-  if (keys["c"])  {
-    ship.velocityX *= 0.92;
-    ship.velocityY *= 0.92;
-  }
-
-  const speed = Math.sqrt(ship.velocityX ** 2 + ship.velocityY ** 2);
-  if (speed > CONFIG.shipMaxSpeed)  {
-    ship.velocityX = (ship.velocityX /speed) * CONFIG.shipMaxSpeed;
-    ship.velocityY = (ship.velocityY /speed) * CONFIG.shipMaxSpeed;
+    return;
   }
 
-  ship.velocityX *= CONFIG.shipFriction;
-  ship.velocityY *= CONFIG.shipFriction;
+  if (respawnTimer <= 0)  {
+    if (keys["ArrowLeft"] || keys["a"]) {
+      ship.angle -= CONFIG.shipRotationSpeed;
+    }
 
-  ship.x += ship.velocityX;
-  ship.y += ship.velocityY;
+    if (keys["ArrowRight"] || keys["d"])  {
+      ship.angle += CONFIG.shipRotationSpeed;
+    }
 
-  if (ship.x < 0) ship.x = canvas.width;
-  if (ship.x > canvas.width) ship.x = 0;
-  if (ship.y < 0) ship.y = canvas.height;
-  if (ship.y > canvas.height) ship.y = 0;
-  
+    if (keys["ArrowUp"] || keys["w"]) {
+      ship.velocityX += Math.cos(ship.angle) * CONFIG.shipThrust;
+      ship.velocityY += Math.sin(ship.angle) * CONFIG.shipThrust;
+      spawnTrailParticle();
+    }
+
+    if (keys["ArrowDown"] || keys["s"]) {
+      ship.velocityX -= Math.cos(ship.angle) * CONFIG.shipReverseThrust;
+      ship.velocityY -= Math.sin(ship.angle) * CONFIG.shipReverseThrust;
+    }
+
+    if (keys["c"])  {
+      ship.velocityX *= 0.92;
+      ship.velocityY *= 0.92;
+    }
+
+    const speed = Math.sqrt(ship.velocityX ** 2 + ship.velocityY ** 2);
+    if (speed > CONFIG.shipMaxSpeed)  {
+      ship.velocityX = (ship.velocityX /speed) * CONFIG.shipMaxSpeed;
+      ship.velocityY = (ship.velocityY /speed) * CONFIG.shipMaxSpeed;
+    }
+
+    ship.velocityX *= CONFIG.shipFriction;
+    ship.velocityY *= CONFIG.shipFriction;
+
+    ship.x += ship.velocityX;
+    ship.y += ship.velocityY;
+
+    if (ship.x < 0) ship.x = canvas.width;
+    if (ship.x > canvas.width) ship.x = 0;
+    if (ship.y < 0) ship.y = canvas.height;
+    if (ship.y > canvas.height) ship.y = 0;
+  }
+
   for (let i = particles.length - 1; i >= 0; i--) {
     particles[i].life--;
     if (particles[i].life <= 0) {
       particles.splice(i, 1);
-      
+    }
+  }
+
+  for (let i = explosions.length - 1; i >= 0; i--) {
+    explosions[i].life--;
+    if (explosions[i].life <= 0) {
+      explosions.splice(i, 1);
     }
   }
 
@@ -398,7 +462,14 @@ function update() {
     invincibleTimer--;
   }
 
-  if ((keys[" "] || keys["Mouse0"] || turboActive) && fireCooldown <= 0 && reloadTimer <= 0) {
+  if (respawnTimer > 0)  {
+    respawnTimer--;
+    if (respawnTimer <= 0)  {
+      respawnShip();
+    }
+  }
+
+  if (respawnTimer <= 0 && (keys[" "] || keys["Mouse0"] || turboActive) && fireCooldown <= 0 && reloadTimer <= 0) {
     if (CONFIG.tripleShot)  {
         spawnBullet(-17, -16);
         spawnBullet(0, 7);
@@ -442,7 +513,6 @@ function update() {
     if (a.x > canvas.width + a.radius) a.x = -a.radius;
     if (a.y < -a.radius) a.y = canvas.height + a.radius;
     if (a.y > canvas.height + a.radius) a.y = -a.radius
-    
   }
 }
 
@@ -477,6 +547,8 @@ function drawParticles()  {
 } 
 
 function drawShip() {
+  if (gameOver || respawnTimer > 0) return;
+
   if (invincibleTimer > 0 && Math.floor (invincibleTimer / 6) % 2 === 0)  {
     return;
   }
@@ -492,6 +564,25 @@ function drawShip() {
     CONFIG.shipSize * 2
   );
   ctx.restore();
+}
+
+function drawExplosions() {
+  for (const e of explosions) {
+    const lifeRatio = e.life / CONFIG.explosionDuration;
+    const growRatio = 1 - lifeRatio;
+    const currentSize = CONFIG.explosionSize * (0.3 + growRatio * 0.7);
+    const alpha = lifeRatio ** 0.3;
+
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(
+      IMAGES.explosion,
+      e.x - currentSize / 2,
+      e.y - currentSize / 2,
+      currentSize,
+      currentSize
+    );
+    ctx.globalAlpha = 1;
+  }
 }
 
 function drawBullets()  {
@@ -510,6 +601,51 @@ function drawBullets()  {
   }
 }
 
+function drawHUD()  {
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "400 30px 'Audiowide', sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(`Lives: ${lives}`, 20, 30);
+  ctx.textAlign = "right";
+  ctx.fillText(`Score: ${score}`, canvas.width - 20, 30);
+  ctx.fillText(`High Score: ${highScore}`, canvas.width - 20, 58);
+}
+
+function drawGameOver() {
+  ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.font = "900 64px 'Audiowide', sans-serif";
+  ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
+
+  ctx.font = "700 32px 'Audiowide', sans-serif";
+  ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
+  ctx.fillText("Press R to Restart", canvas.width / 2, canvas.height / 2 + 60);
+}
+
+function resetGame()  {
+  lives = CONFIG.shipLives;
+  score = 0;
+  gameOver = false;
+
+  asteroids.length = 0;
+  bullets.length = 0;
+  particles.length = 0;
+
+  fireCooldown = 0;
+  turboActive = false;
+  turboTimer = 0;
+  reloadTimer = 0;
+  asteroidSpawnTimer = 0;
+  CONFIG.tripleShot = false;
+  
+  respawnTimer = 0;
+  respawnShip();
+  invincibleTimer = 0;
+}
+
 function draw() {
   ctx.fillStyle = CONFIG.backgroundColor;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -518,6 +654,15 @@ function draw() {
   drawParticles();
   drawShip();
   drawBullets();
+  drawExplosions();
+  drawHUD();
+
+  if (gameOver) {
+    drawGameOver();
+    canvas.style.cursor = "default";
+  } else {
+    canvas.style.cursor = "none";
+  }
 }
 
 function gameLoop()  {
