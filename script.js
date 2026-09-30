@@ -25,8 +25,8 @@ const CONFIG = {
   tripleSpeed: 1.5,
   tripleDuration: 1300,
   tripleBlinkingDuration: 500,
-  tripleSpawnScore: 600, //6600
-  tripleSpawnScoreIncrease: 5000,
+  tripleSpawnScore: 6600, //6600
+  tripleSpawnScoreIncrease: 10000,
   tripleFireDuration: 1100,
 
   // Rapid
@@ -36,11 +36,11 @@ const CONFIG = {
   rapidSpeed: 1.5,
   rapidDuration: 1300,
   rapidBlinkingDuration: 500,
-  rapidSpawnScore: 300, //3300
-  rapidSpawnScoreIncrease: 5000,
+  rapidSpawnScore: 3300, //3300
+  rapidSpawnScoreIncrease: 10000,
   
-  allThreePowerupsScore: 20000,
-  allThreePowerupsScoreIncrease: 2000,
+  allThreePowerupsScore: 50000,
+  allThreePowerupsScoreIncrease: 5000,
   
   // Asteroids
   asteroidSpawnRate: 150,
@@ -76,7 +76,7 @@ const CONFIG = {
   heartSpeed: 1.5,
   heartDuration: 1300,
   heartBlinkingDuration: 500,
-  heartSpawnScoreAmount: 300, // 5000
+  heartSpawnScoreAmount: 5000, // 5000
   heartSpawnScoreIncrease: 10000,
 
   // stars
